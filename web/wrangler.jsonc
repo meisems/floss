@@ -1,0 +1,9 @@
+{
+  // Floss Mini App (Cloudflare Pages). Pages reads this file from the project root directory
+  // ("web"), so the binding to the Worker is defined here instead of in the dashboard.
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "floss-app",
+  "pages_build_output_dir": ".",
+  "compatibility_date": "2026-09-01",
+  "services": [{ "binding": "FLOSS_API", "service": "floss" }]
+}

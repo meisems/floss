@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.wrangler/
+**/.wrangler/
+.dev.vars
+prisma/dev.db*
+src/generated/

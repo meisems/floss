@@ -1,0 +1,155 @@
+// Floss data model (Cloudflare D1 / SQLite).
+// D1 is the source of truth for users, vault config, rules and audit history.
+// Live per-wallet state (locks, cooldowns, idempotency) lives in the WalletSession Durable Object.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  runtime      = "cloudflare"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id         String   @id @default(cuid())
+  telegramId String   @unique
+  chatId     String
+  username   String?
+  /// Base64 32-byte salt used for HKDF derivation of this user's session-key encryption keys.
+  keySalt    String
+  /// Global kill switch for automated sweeps.
+  paused     Boolean  @default(false)
+  /// Short public code used in t.me/<bot>?start=ref_<code> links.
+  referralCode         String?  @unique
+  referredById         String?
+  referredAt           DateTime?
+  /// Referral share that could not be delivered yet (recipient wallet below rent). Settled from
+  /// future platform fees inside later sweep transactions, so Floss never custodies it.
+  referralOwedLamports BigInt   @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  coldVault  ColdVaultConfig?
+  sessions   SessionWallet[]
+  rules      SweepTriggerRule[]
+  auditLogs  AuditLog[]
+  referredBy User?       @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals  User[]      @relation("Referrals")
+  feesPaid   FeeLedger[] @relation("FeePayer")
+  feesEarned FeeLedger[] @relation("FeeReferrer")
+
+  @@index([referredById])
+}
+
+model SessionWallet {
+  id                   String    @id @default(cuid())
+  userId               String
+  label                String
+  address              String    @unique
+  /// ACTIVE | PAUSED | ENDING | PURGED
+  status               String    @default("ACTIVE")
+  /// AES-256-GCM ciphertext of the 32-byte ed25519 seed (base64). Null once purged.
+  encryptedKey         String?
+  /// 12-byte GCM IV (base64). Null once purged.
+  keyIv                String?
+  /// Which MASTER_KEY_V{n} secret encrypted this record.
+  keyVersion           Int
+  /// SOL kept in the wallet for trading. Never swept by profit rules.
+  workingFloatLamports BigInt    @default(0)
+  /// Reference balance for percentage profit rules.
+  baselineLamports     BigInt?
+  exportCount          Int       @default(0)
+  lastSweepAt          DateTime?
+  lastCheckedAt        DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  endedAt              DateTime?
+  purgedAt             DateTime?
+
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  auditLogs AuditLog[]
+
+  @@index([userId, status])
+  @@index([status, lastCheckedAt])
+}
+
+model ColdVaultConfig {
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  address            String
+  /// Time-locked replacement address. Becomes active at pendingEffectiveAt.
+  pendingAddress     String?
+  pendingEffectiveAt DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([pendingEffectiveAt])
+}
+
+model SweepTriggerRule {
+  id                String   @id @default(cuid())
+  userId            String
+  /// "default" for user-wide rules, or a SessionWallet id for a per-session override.
+  scope             String   @default("default")
+  /// PROFIT_ABSOLUTE | PROFIT_PERCENT | IDLE_TIMEOUT | REVOKE_ON_SIGHT | CLOSE_EMPTY
+  kind              String
+  enabled           Boolean  @default(true)
+  thresholdLamports BigInt?
+  percentBps        Int?
+  idleMinutes       Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, scope, kind])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  sessionId String?
+  /// e.g. SESSION_CREATED, KEY_EXPORTED, FLOSS, COLD_WALLET_SET, COLD_WALLET_PENDING, KEY_PURGED, SCAN
+  action    String
+  /// OK | FAILED | SKIPPED | PENDING
+  status    String
+  /// JSON payload with action-specific details. Never contains key material.
+  detail    String   @default("{}")
+  signature String?
+  lamports  BigInt?
+  createdAt DateTime @default(now())
+
+  user    User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session SessionWallet? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
+/// One row per floss that charged a fee. Amounts are what actually moved on chain.
+model FeeLedger {
+  id                String   @id @default(cuid())
+  payerUserId       String
+  sessionId         String?
+  referrerUserId    String?
+  /// SOL value delivered to the payer's vault that the fee was charged on.
+  baseLamports      BigInt
+  feeLamports       BigInt
+  platformLamports  BigInt
+  referrerLamports  BigInt
+  /// PAID (delivered in the tx) | ACCRUED (owed, recipient below rent) | NONE (no referrer)
+  referrerStatus    String
+  signature         String?
+  createdAt         DateTime @default(now())
+
+  payer    User  @relation("FeePayer", fields: [payerUserId], references: [id], onDelete: Cascade)
+  referrer User? @relation("FeeReferrer", fields: [referrerUserId], references: [id], onDelete: SetNull)
+
+  @@index([payerUserId, createdAt])
+  @@index([referrerUserId, createdAt])
+}

@@ -1,0 +1,63 @@
+{
+  // Floss Worker. Workers Builds reads this file on every push, so it is the source of truth for
+  // bindings. Secrets are NOT in here: set them in the dashboard (Settings -> Variables and Secrets).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "floss",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "observability": { "enabled": true },
+
+  "vars": {
+    "SOLANA_CLUSTER": "mainnet-beta",
+    "HELIUS_API_BASE": "https://api.helius.xyz",
+    "JITO_ENABLED": "true",
+    "JITO_BLOCK_ENGINE_URL": "https://mainnet.block-engine.jito.wtf",
+    "MAX_PRIORITY_FEE_MICROLAMPORTS": "2000000",
+    "MIN_JITO_TIP_LAMPORTS": "10000",
+    "MAX_JITO_TIP_LAMPORTS": "5000000",
+    "TRADE_GUARD_SECONDS": "20",
+    "COLD_WALLET_TIMELOCK_HOURS": "24",
+    "MAX_SESSIONS_PER_USER": "5",
+    "MASTER_KEY_VERSION": "1",
+    "CACHE_SCHEMA_VERSION": "1",
+    // Fees: 1% of SOL delivered to the user's vault; 25% of that fee goes to their referrer.
+    // FEE_WALLET must be a funded wallet you control (keep >= 0.01 SOL in it). Empty = fees off.
+    "FEE_WALLET": "",
+    "FEE_BPS": "100",
+    "REFERRAL_SHARE_BPS": "2500",
+    // Your Pages project URL, e.g. "https://floss-app.pages.dev". Leave empty to hide the Mini App.
+    "PAGES_URL": ""
+  },
+
+  // Step 2 of the runbook: create these in the dashboard, then paste the IDs here.
+  "d1_databases": [
+    { "binding": "DB", "database_name": "floss-db", "database_id": "PASTE_D1_DATABASE_ID" }
+  ],
+  "kv_namespaces": [
+    { "binding": "CACHE_KV", "id": "PASTE_KV_NAMESPACE_ID" }
+  ],
+
+  "queues": {
+    "producers": [{ "binding": "JOBS", "queue": "floss-jobs" }],
+    "consumers": [
+      {
+        "queue": "floss-jobs",
+        "max_batch_size": 5,
+        "max_batch_timeout": 1,
+        "max_retries": 5,
+        "dead_letter_queue": "floss-jobs-dlq"
+      }
+    ]
+  },
+
+  "durable_objects": {
+    "bindings": [{ "name": "WALLET_SESSION", "class_name": "WalletSession" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["WalletSession"] }],
+
+  "triggers": { "crons": ["*/2 * * * *", "17 * * * *"] },
+
+  "ratelimits": [
+    { "name": "USER_RATE_LIMITER", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } }
+  ]
+}

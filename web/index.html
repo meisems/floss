@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-skin="mint">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#07090b">
+  <meta name="robots" content="noindex">
+  <title>Floss</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/styles.2.css">
+  <!-- Applies the saved skin/mode before first paint (no theme flash). -->
+  <script src="/assets/theme.2.js"></script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <!-- Shared gradient definitions (theme-aware via CSS variables). -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <linearGradient id="threadGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0" style="stop-color:var(--a)"/><stop offset="1" style="stop-color:var(--a2)"/></linearGradient>
+      <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--a)"/><stop offset="1" style="stop-color:var(--a2)"/></linearGradient>
+      <linearGradient id="capGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:color-mix(in oklch, var(--a) 26%, var(--ink-3))"/><stop offset="1" style="stop-color:var(--ink-2)"/></linearGradient>
+      <linearGradient id="capEdge" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:color-mix(in oklch, var(--a) 60%, transparent)"/><stop offset="1" style="stop-color:var(--line)"/></linearGradient>
+      <linearGradient id="shineGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+      <clipPath id="capClip"><rect x="46" y="34" width="28" height="100" rx="14"/><rect x="94" y="34" width="28" height="100" rx="14"/></clipPath>
+    </defs>
+  </svg>
+
+  <div class="ambient" aria-hidden="true"><i class="blob b1"></i><i class="blob b2"></i><i class="blob b3"></i><i class="grain"></i></div>
+
+  <div class="loader" id="loader" role="status" aria-label="Loading Floss">
+    <div class="ambient" aria-hidden="true"><i class="blob b1"></i><i class="blob b2"></i><i class="blob b3"></i><i class="grain"></i></div>
+    <div class="dots" aria-hidden="true"></div>
+    <div class="mark" aria-hidden="true">
+      <div class="halo"></div>
+      <svg viewBox="0 0 168 168">
+        <rect class="cap" x="46" y="34" width="28" height="100" rx="14" fill="url(#capGrad)" stroke="url(#capEdge)" stroke-width="1.5"/>
+        <rect class="cap c2" x="94" y="34" width="28" height="100" rx="14" fill="url(#capGrad)" stroke="url(#capEdge)" stroke-width="1.5"/>
+        <g clip-path="url(#capClip)"><rect class="shine" x="30" y="20" width="34" height="130" fill="url(#shineGrad)" transform="skewX(-18)"/></g>
+        <path class="thread" pathLength="300" d="M10 112 C 34 114, 44 58, 60 60 C 76 62, 72 112, 84 110 C 96 108, 96 54, 108 54 C 122 54, 128 100, 158 58"/>
+        <path class="comet" pathLength="300" d="M10 112 C 34 114, 44 58, 60 60 C 76 62, 72 112, 84 110 C 96 108, 96 54, 108 54 C 122 54, 128 100, 158 58"/>
+        <path class="spark" d="M150 34 l3 7.5 7.5 3 -7.5 3 -3 7.5 -3 -7.5 -7.5 -3 7.5 -3z"/>
+        <path class="spark s2" d="M164 72 l2 4.5 4.5 2 -4.5 2 -2 4.5 -2 -4.5 -4.5 -2 4.5 -2z"/>
+        <path class="spark s3" d="M136 24 l1.5 3.5 3.5 1.5 -3.5 1.5 -1.5 3.5 -1.5 -3.5 -3.5 -1.5 3.5 -1.5z"/>
+      </svg>
+    </div>
+    <div class="brandline">
+      <div class="wordmark" aria-hidden="true"><span>f</span><span>l</span><span>o</span><span>s</span><span>s</span></div>
+      <div class="tagline">floss your wallet</div>
+    </div>
+    <div class="progress" id="progress"><i></i></div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <main class="app" id="app"></main>
+
+  <nav class="nav" id="nav" hidden>
+    <div class="pill" id="navPill"></div>
+    <button data-tab="home" aria-label="Wallets" class="on"></button>
+    <button data-tab="scan" aria-label="Scan"></button>
+    <button data-tab="earn" aria-label="Earn"></button>
+    <button data-tab="rules" aria-label="Rules"></button>
+    <button data-tab="log" aria-label="Activity"></button>
+  </nav>
+
+  <div class="scrim" id="scrim" hidden></div>
+  <section class="sheet" id="sheet" aria-label="Appearance" hidden></section>
+
+  <script type="module" src="/assets/app.2.js"></script>
+</body>
+</html>
