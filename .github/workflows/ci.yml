@@ -20,9 +20,10 @@ jobs:
         name: npm debug log
         run: grep -vE "^[0-9]+ (http|silly (fetch|packumentCache|tarball))" "$(ls -t ~/.npm/_logs/*-debug-0.log | head -n 1)" | tail -n 200
       - run: npm run build
+      # Test-only tools, kept out of package.json: Cloudflare's lockfile-less `npm install` on
+      # npm 10.9.2 crashes in vitest's peer set ("reading 'edgesOut'"), and litesvm ships native
+      # binaries. Neither is needed to build or deploy.
+      - run: npm install --no-save vitest@4.1.11 litesvm@1.5.0
       - run: npm run typecheck
-      # Test-only: runs the real SPL Token / Token-2022 programs in-process. Kept out of
-      # package.json so Cloudflare's install never sees its native binaries or peer ranges.
-      - run: npm install --no-save litesvm@1.5.0
       - run: npm test
       - run: npx wrangler deploy --dry-run --outdir dist

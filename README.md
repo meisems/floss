@@ -99,6 +99,8 @@ Open `https://floss.<your-subdomain>.workers.dev/admin/setup`. The **Generate a 
 | Build output directory | `.` |
 | Root directory | `web` |
 
+> **Root directory must be `web`.** If the build log says *"A Wrangler configuration file was found but it does not appear to be valid … `pages_build_output_dir`"* or runs `npm install`, the project is pointed at the repo root: open the Pages project → **Settings → Build → Root directory** → `web`, clear the build command, then **Deployments → Retry deployment**. The Worker is a separate project (step 4); don't deploy it through Pages.
+
 The link to the Worker (`FLOSS_API`) is already set in [`web/wrangler.jsonc`](web/wrangler.jsonc). After it deploys, copy the URL (e.g. `https://floss-app.pages.dev`), set `"PAGES_URL"` in the root `wrangler.jsonc` on GitHub, and commit. The Worker redeploys by itself.
 
 ### 7. Helius webhook
@@ -130,7 +132,7 @@ In Telegram: `/start` → `/set_cold_wallet <your cold wallet>` → `/session ne
 | Rotate master key | Add secret `MASTER_KEY_V2` → set `MASTER_KEY_VERSION` to `"2"` in `wrangler.jsonc` → commit. The hourly cron re-encrypts every key. Once `/admin/setup` shows no keys left on v1, delete `MASTER_KEY_V1`. |
 | Flush cache | Bump `CACHE_SCHEMA_VERSION` in `wrangler.jsonc` |
 | Change fees | `FEE_BPS` (100 = 1%) and `REFERRAL_SHARE_BPS` (2500 = 25% of the fee) in `wrangler.jsonc` |
-| Tests | Every push runs `.github/workflows/ci.yml` (typecheck, the full test suite, bundle check) |
+| Tests | Every push runs `.github/workflows/ci.yml` (typecheck, the full test suite, bundle check). Test tools aren't in `package.json` so Cloudflare's install stays lean; locally run `npm i --no-save vitest@4.1.11 litesvm@1.5.0` first. |
 
 ## Commands
 
