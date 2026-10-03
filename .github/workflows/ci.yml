@@ -22,8 +22,8 @@ jobs:
       - run: npm run build
       # Test-only tools, kept out of package.json: Cloudflare's lockfile-less `npm install` on
       # npm 10.9.2 crashes in vitest's peer set ("reading 'edgesOut'"), and litesvm ships native
-      # binaries. Neither is needed to build or deploy.
-      - run: npm install --no-save vitest@4.1.11 litesvm@1.5.0
+      # binaries. Neither is needed to build or deploy; npm 11 installs them without the crash.
+      - run: npx -y npm@11 install --no-save vitest@4.1.11 litesvm@1.5.0
       - run: npm run typecheck
       - run: npm test
       - run: npx wrangler deploy --dry-run --outdir dist
