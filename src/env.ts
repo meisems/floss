@@ -10,6 +10,7 @@ export interface Env {
   DB: D1Database;
   CACHE_KV: KVNamespace;
   JOBS: Queue<JobMessage>;
+  JOBS_DLQ?: Queue<JobMessage>;
   WALLET_SESSION: DurableObjectNamespace<WalletSession>;
   USER_RATE_LIMITER?: RateLimit;
 

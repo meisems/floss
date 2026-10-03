@@ -29,16 +29,19 @@
     "PAGES_URL": ""
   },
 
-  // Step 2 of the runbook: create these in the dashboard, then paste the IDs here.
-  "d1_databases": [
-    { "binding": "DB", "database_name": "floss-db", "database_id": "PASTE_D1_DATABASE_ID" }
-  ],
-  "kv_namespaces": [
-    { "binding": "CACHE_KV", "id": "PASTE_KV_NAMESPACE_ID" }
-  ],
+  // No IDs on purpose: the first deploy creates the D1 database, KV namespace and both queues
+  // (Wrangler automatic provisioning) and later deploys reuse them. The Worker applies
+  // migrations/*.sql to the database by itself. To use resources you already have, add
+  // "database_id" / "id" here.
+  "d1_databases": [{ "binding": "DB", "database_name": "floss-db" }],
+  "kv_namespaces": [{ "binding": "CACHE_KV" }],
 
   "queues": {
-    "producers": [{ "binding": "JOBS", "queue": "floss-jobs" }],
+    "producers": [
+      { "binding": "JOBS", "queue": "floss-jobs" },
+      // Bound so the dead-letter queue gets provisioned too; nothing sends to it directly.
+      { "binding": "JOBS_DLQ", "queue": "floss-jobs-dlq" }
+    ],
     "consumers": [
       {
         "queue": "floss-jobs",

@@ -8,6 +8,7 @@ import { handleMiniApp } from "./http/miniapp.ts";
 import { health, runSetup, setupForm } from "./http/admin.ts";
 import { handleScheduled } from "./jobs/cron.ts";
 import { handleQueue } from "./jobs/consumer.ts";
+import { ensureSchema } from "./db/schema.ts";
 import type { JobMessage } from "./jobs/types.ts";
 
 export { WalletSession } from "./durable/WalletSession.ts";
@@ -30,13 +31,14 @@ export default {
   async fetch(req: Request, env: Env, exec: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
     try {
+      if (url.pathname === "/") return new Response("floss: ok\n", { headers: { "content-type": "text/plain" } });
+      if (url.pathname === "/admin/setup" && req.method === "GET") return setupForm();
+      await ensureSchema(env.DB);
       if (url.pathname === "/telegram" && req.method === "POST") return await telegram(req, env, exec);
       if (url.pathname === "/webhooks/helius" && req.method === "POST") return await handleHeliusWebhook(req, env, exec);
       if (url.pathname.startsWith("/api/")) return await handleMiniApp(req, env, exec);
-      if (url.pathname === "/admin/setup" && req.method === "GET") return setupForm();
       if (url.pathname === "/admin/setup" && req.method === "POST") return await runSetup(req, env, exec);
       if (url.pathname === "/health") return await health(env);
-      if (url.pathname === "/") return new Response("floss: ok\n", { headers: { "content-type": "text/plain" } });
       return new Response("not found", { status: 404 });
     } catch (err) {
       log("error", "unhandled request error", { path: url.pathname, err: errorMessage(err) });
@@ -45,10 +47,11 @@ export default {
   },
 
   async scheduled(controller: ScheduledController, env: Env, exec: ExecutionContext): Promise<void> {
-    exec.waitUntil(handleScheduled(controller, env));
+    exec.waitUntil(ensureSchema(env.DB).then(() => handleScheduled(controller, env)));
   },
 
   async queue(batch: MessageBatch<JobMessage>, env: Env): Promise<void> {
+    await ensureSchema(env.DB);
     await handleQueue(batch, env);
   },
 } satisfies ExportedHandler<Env, JobMessage>;

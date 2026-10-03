@@ -50,14 +50,12 @@ In Telegram, open **@BotFather**, send `/newbot`, and copy the **token**.
 1. github.com → **New repository** → name it `floss` → **Private** → Create.
 2. **uploading an existing file** → drag in everything inside this `floss` folder *except* `node_modules`, `.wrangler`, `dist`, `src/generated` and `.dev.vars` (if present) → **Commit changes**.
 
-### 3. Create storage (Cloudflare dashboard)
-1. **Storage & Databases → D1 → Create** → name `floss-db` → Create.
-   Open it → **Console** → paste the whole of [`migrations/0001_init.sql`](migrations/0001_init.sql) → **Execute**. Then do the same with [`migrations/0002_referrals_fees.sql`](migrations/0002_referrals_fees.sql). Copy the **Database ID**.
-   *(Already running an older Floss? Paste only `0002`. It only adds columns and a table; nothing is rebuilt or deleted.)*
-2. **Storage & Databases → KV → Create** → name `floss-cache`. Copy its **ID**.
-3. **Queues → Create queue** → `floss-jobs`. Create a second one: `floss-jobs-dlq`.
-4. On GitHub, open `wrangler.jsonc` → ✏️ edit → replace `PASTE_D1_DATABASE_ID` and `PASTE_KV_NAMESPACE_ID`, and set `"FEE_WALLET"` to a wallet you control that will receive fees → Commit.
-   Send that fee wallet about **0.01 SOL** once, so small fees can land in it (Solana won't create an account below its rent minimum).
+### 3. Storage: nothing to do
+The first Worker deploy creates the D1 database (`floss-db`), the KV namespace and both queues by itself (Wrangler automatic provisioning), and the Worker sets up its own database tables on first use. There are no IDs to paste and no SQL to run.
+
+Optional, before going live: on GitHub, edit `wrangler.jsonc` and set `"FEE_WALLET"` to a wallet you control (empty = fees off). Send it about **0.01 SOL** once, so small fees can land in it (Solana won't create an account below its rent minimum).
+
+*(Already created D1/KV by hand? Add `"database_id"` / `"id"` to those bindings in `wrangler.jsonc` and the Worker uses them. Tables you created from the console are recognised and not re-created.)*
 
 ### 4. Deploy the Worker
 **Workers & Pages → Create → Import a repository** → pick `floss`:
@@ -69,7 +67,9 @@ In Telegram, open **@BotFather**, send `/newbot`, and copy the **token**.
 | Deploy command | `npx wrangler deploy` |
 | Root directory | `/` |
 
-Deploy, then note the URL: `https://floss.<your-subdomain>.workers.dev`.
+Deploy, then note the URL: `https://floss.<your-subdomain>.workers.dev`. Opening it shows `floss: ok`, and `/health` lists what's still missing (secrets, fee wallet). The Worker runs without them; the bot answers once the secrets below are added.
+
+**Deploy the Worker before the Pages project**: Pages links to it by the name `floss` and fails with *"Service binding 'FLOSS_API' references Worker 'floss' which was not found"* until it exists.
 
 ### 5. Generate secrets
 Open `https://floss.<your-subdomain>.workers.dev/admin/setup`. The **Generate a secret** buttons create random values in your browser (nothing is sent anywhere). Then go to **Worker → Settings → Variables and Secrets → Add** and add each one as type **Secret**:

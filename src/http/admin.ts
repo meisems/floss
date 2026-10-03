@@ -128,7 +128,7 @@ async function healthRows(env: Env): Promise<Array<[string, boolean, string]>> {
     const r = await env.DB.prepare(`SELECT COUNT(*) AS n FROM "User"`).first<{ n: number }>();
     rows.push(["d1", true, `${r?.n ?? 0} users`]);
   } catch (err) {
-    rows.push(["d1", false, `${errorMessage(err)}. Paste migrations/0001_init.sql into the D1 Console.`]);
+    rows.push(["d1", false, `${errorMessage(err)}. Check the DB binding in wrangler.jsonc; tables are created automatically on first request.`]);
   }
   try {
     await env.CACHE_KV.get("health-probe");
