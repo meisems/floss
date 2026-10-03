@@ -5,41 +5,24 @@ on:
   pull_request:
 
 jobs:
+  # Installs exactly like Cloudflare's build image (Node 22.16, npm 10.9.2, `npm install --progress=false`,
+  # no lockfile), so a dependency change that would break the Cloudflare build fails here first.
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      # Test-only: runs the real SPL Token / Token-2022 programs in-process. Kept out of
-      # package.json so Cloudflare's install never sees its native binaries or peer ranges.
-      - run: npm install --no-save litesvm@1.5.0
-      - run: npm run build
-      - run: npm run typecheck
-      - run: npm test
-      - run: npx wrangler deploy --dry-run --outdir dist
-
-  # Mirrors Cloudflare's build image (Node 22.16, npm 10.9.2, `npm install --progress=false`), with
-  # and without a lockfile, so a dependency change that would break the Cloudflare build fails here.
-  cloudflare-install:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        lockfile: [kept, removed]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
           node-version: 22.16.0
       - run: npm install -g npm@10.9.2
-      - if: matrix.lockfile == 'removed'
-        run: rm package-lock.json
       - run: npm install --progress=false
       - if: failure()
         name: npm debug log
-        run: tail -n 120 ~/.npm/_logs/*-debug-0.log
+        run: grep -vE "^[0-9]+ (http|silly (fetch|packumentCache|tarball))" "$(ls -t ~/.npm/_logs/*-debug-0.log | head -n 1)" | tail -n 200
       - run: npm run build
+      - run: npm run typecheck
+      # Test-only: runs the real SPL Token / Token-2022 programs in-process. Kept out of
+      # package.json so Cloudflare's install never sees its native binaries or peer ranges.
+      - run: npm install --no-save litesvm@1.5.0
+      - run: npm test
       - run: npx wrangler deploy --dry-run --outdir dist
