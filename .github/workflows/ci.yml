@@ -14,8 +14,29 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Test-only: runs the real SPL Token / Token-2022 programs in-process. Kept out of
+      # package.json so Cloudflare's install never sees its native binaries or peer ranges.
+      - run: npm install --no-save litesvm@1.5.0
       - run: npm run build
       - run: npm run typecheck
-      # Includes the LiteSVM suite (real SPL Token / Token-2022 programs), which needs Linux.
       - run: npm test
+      - run: npx wrangler deploy --dry-run --outdir dist
+
+  # Mirrors Cloudflare's build image (Node 22.16, npm 10.9.2, `npm install --progress=false`), with
+  # and without a lockfile, so a dependency change that would break the Cloudflare build fails here.
+  cloudflare-install:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        lockfile: [kept, removed]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.16.0
+      - run: npm install -g npm@10.9.2
+      - if: matrix.lockfile == 'removed'
+        run: rm package-lock.json
+      - run: npm install --progress=false
+      - run: npm run build
       - run: npx wrangler deploy --dry-run --outdir dist

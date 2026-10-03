@@ -126,6 +126,18 @@ function is2022(acc: ParsedTokenAccount): boolean {
   return acc.programId === TOKEN_2022_PROGRAM;
 }
 
+/** Readable simulation error: RPC returns JSON, LiteSVM returns class instances. */
+function describeSimError(err: unknown): string {
+  if (err === null || err === undefined) return "unknown error";
+  try {
+    const json = JSON.stringify(err, (_k, v) => (typeof v === "bigint" ? v.toString() : v));
+    if (json && json !== "{}") return json;
+  } catch {
+    /* fall through */
+  }
+  return String(err);
+}
+
 /** Token-2022 HarvestWithheldTokensToMint (TransferFeeExtension = 26, sub-instruction 4). */
 function harvestIx(mint: string, sources: string[]): Instruction {
   return {
@@ -588,7 +600,7 @@ export class SweepEngine {
 
       if (req.dryRun) {
         const sim = await this.simulateAll(txs);
-        if (!sim.ok) report.notes.push(`Simulation of tx ${sim.index + 1} failed: ${sim.logs.slice(-3).join(" | ") || JSON.stringify(sim.err)}`);
+        if (!sim.ok) report.notes.push(`Simulation of tx ${sim.index + 1} failed: ${describeSimError(sim.err)} | ${sim.logs.slice(-3).join(" | ")}`);
         else report.notes.push("Dry run: every transaction simulated successfully.");
         if (evacuations.length > 0) {
           report.notes.push("Live runs move tokens first, then re-read the balance; this preview holds back an estimate for vault ATA rent.");
@@ -637,7 +649,9 @@ export class SweepEngine {
     const sim = await this.simulateAll(txs);
     if (!sim.ok) {
       const tail = sim.logs.slice(-4).join(" | ");
-      throw new Error(`Pre-flight simulation failed for tx ${sim.index + 1}/${txs.length}: ${tail || JSON.stringify(sim.err)}`);
+      // Lead with the error code: logs alone can look clean when the failure is transaction-level
+      // (e.g. InsufficientFundsForRent after every instruction succeeded).
+      throw new Error(`Pre-flight simulation failed for tx ${sim.index + 1}/${txs.length}: ${describeSimError(sim.err)}${tail ? ` | ${tail}` : ""}`);
     }
 
     const signatures = txs.map((t) => t.signature);

@@ -207,6 +207,9 @@ describe.skipIf(litesvm === null)("SweepEngine on LiteSVM (real token programs)"
     vault = (await generateKeyPairSigner()).address;
     svm.airdrop(funder.address, lamports(100n * SOL));
     svm.airdrop(session.address, lamports(3n * SOL + 4_321n));
+    // Jito tip accounts always exist on mainnet; a fresh LiteSVM has none, and a 10k-lamport tip
+    // into a missing account would fail Solana's rent check.
+    svm.airdrop(address(TIP_ACCOUNT), lamports(SOL));
 
     mintA = await createMint(TOKEN_PROGRAM_ADDRESS, 6);
     accA = await ata(session.address, mintA, TOKEN_PROGRAM_ADDRESS);
@@ -274,7 +277,7 @@ describe.skipIf(litesvm === null)("SweepEngine on LiteSVM (real token programs)"
 
     expect(svm.getBalance(session.address)).toBe(2n * SOL);
     expect((svm.getBalance(address(vault)) ?? 0n) - vaultBefore).toBe(r.sweptLamports + rentB + rentC);
-    expect(svm.getBalance(address(TIP_ACCOUNT))).toBe(10_000n);
+    expect(svm.getBalance(address(TIP_ACCOUNT))).toBe(SOL + 10_000n);
   }, 60_000);
 
   it("full floss with evacuation: tokens land in vault ATAs, wallet ends at 0", async () => {
