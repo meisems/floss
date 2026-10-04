@@ -245,17 +245,31 @@ const TAB_ICONS = { home: "wallet", scan: "shield", earn: "gift", rules: "slider
 function setupNav() {
   const nav = $("#nav");
   nav.hidden = false;
+  document.body.classList.add("has-nav");
   nav.querySelectorAll("button").forEach((b) => {
-    b.innerHTML = icon(TAB_ICONS[b.dataset.tab]);
+    // Labels show on the desktop side rail; phones get the icon-only bottom bar.
+    b.innerHTML = `${icon(TAB_ICONS[b.dataset.tab])}<span>${esc(b.getAttribute("aria-label"))}</span>`;
     b.addEventListener("click", () => go(b.dataset.tab));
   });
+  addEventListener("resize", movePill);
+  movePill();
+}
+
+/** Slides the highlight under the active tab. Works for the bottom bar and the side rail. */
+function movePill() {
+  const btn = $(`#nav button[data-tab="${state.tab}"]`);
+  const pill = $("#navPill");
+  if (!btn || !pill) return;
+  pill.style.width = `${btn.offsetWidth}px`;
+  pill.style.height = `${btn.offsetHeight}px`;
+  pill.style.transform = `translate(${btn.offsetLeft - pill.offsetLeft}px, ${btn.offsetTop - pill.offsetTop}px)`;
 }
 
 function go(tab) {
   if (!TABS.includes(tab)) return;
   if (tab !== state.tab) haptic("select");
   state.tab = tab;
-  $("#navPill").style.transform = `translateX(${TABS.indexOf(tab) * 60}px)`;
+  movePill();
   document.querySelectorAll("#nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
   render();
   if (tab === "log") loadAudit();
@@ -657,12 +671,13 @@ function landingView(notice) {
   const pub = state.pub ?? { bot: null, stats: null };
   const st = pub.stats;
   const bot = pub.bot;
-  const view = h(`<section class="landing enter">
-    <div class="land-hero">
+  const view = h(`<section class="landing">
+    <div class="land-hero enter">
       <div class="land-mark">${logo}</div>
       <h1>Floss your<br><span class="grad-text">wallet.</span></h1>
       <p>Burner wallets that sweep profit to cold storage on their own.</p>
     </div>
+    <div class="land-side enter">
     <div class="feat">${FEATURES.map(([i, t]) => `<div class="glass feat-i">${icon(i)}<span>${t}</span></div>`).join("")}</div>
     ${notice ? `<div class="glass notice">${icon("alert")}<span>${esc(notice)}</span></div>` : ""}
     <div class="glass login">
@@ -679,6 +694,7 @@ function landingView(notice) {
           </div>`
         : ""
     }
+    </div>
   </section>`);
   if (bot) {
     // Redirect flow (no inline callback, so the CSP needs no unsafe-eval): Telegram sends the
