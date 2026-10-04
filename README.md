@@ -16,7 +16,7 @@ Everything deploys from the **Cloudflare dashboard and GitHub's website**. You n
 | **Pre-flight scan** | `/scan_token <mint \| tx \| Solana Pay / Blink link>` checks mint/freeze authority, permanent delegate, transfer fees and hooks, pausable mints, and hidden taxes (by simulating a real holder's transfer). For transactions it simulates the effects: approvals, ownership changes, SOL/token drains, durable-nonce traps. |
 | **Vault time lock** | Changing your cold wallet takes 24h. If someone hijacks your Telegram, you have a day to `/set_cold_wallet cancel`. |
 | **Fees + referrals** | **1%** of the SOL each floss delivers to your vault (swept SOL, reclaimed rent, unwrapped SOL). **25% of that fee** goes to whoever referred you, paid to their cold wallet inside the same transaction. Token transfers are fee-free. |
-| **Mini App** | Dashboard inside Telegram with 5 themes (Mint, Aurora, Ember, Glacier, Noir) in light and dark: balances, sweep progress rings, scans, referral earnings, rules, and activity. |
+| **Mini App + website** | Dashboard inside Telegram, and on the web with Telegram login. 5 themes (Mint, Aurora, Ember, Glacier, Noir) in light and dark: balances, sweep progress rings, scans, referral earnings, rules, and activity. |
 
 ## Architecture
 
@@ -100,6 +100,8 @@ Open `https://floss.<your-subdomain>.workers.dev/admin/setup`. The **Generate a 
 | Root directory | `web` |
 
 > **Root directory must be `web`.** If the build log says *"A Wrangler configuration file was found but it does not appear to be valid … `pages_build_output_dir`"* or runs `npm install`, the project is pointed at the repo root: open the Pages project → **Settings → Build → Root directory** → `web`, clear the build command, then **Deployments → Retry deployment**. The Worker is a separate project (step 4); don't deploy it through Pages.
+
+**Website login.** The same dashboard also works in any browser at your Pages URL: visitors see the landing page with live totals, and users log in with **Log in with Telegram**. For that button to work, tell Telegram your site's domain once: **@BotFather → /setdomain → pick your bot → `floss-app.pages.dev`** (your Pages domain, without `https://`). A login lasts 7 days; **Log out** is in the theme sheet.
 
 The link to the Worker (`FLOSS_API`) is already set in [`web/wrangler.jsonc`](web/wrangler.jsonc). After it deploys, copy the URL (e.g. `https://floss-app.pages.dev`), set `"PAGES_URL"` in the root `wrangler.jsonc` on GitHub, and commit. The Worker redeploys by itself.
 

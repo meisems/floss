@@ -21,7 +21,7 @@ import {
 import { ScanInputError, SimulationGuard } from "../engine/SimulationGuard.ts";
 import type { FlossMode } from "../engine/SweepEngine.ts";
 import { CACHE_POLICY, LayeredCache } from "../lib/cache.ts";
-import { verifyInitData } from "../lib/telegramAuth.ts";
+import { verifyInitData, verifyLoginWidget, type TelegramWebAppUser } from "../lib/telegramAuth.ts";
 import { errorMessage, parseSol, randomId } from "../lib/util.ts";
 import { SolanaRpc } from "../solana/rpc.ts";
 import type { FlossJob } from "../jobs/types.ts";
@@ -100,13 +100,42 @@ async function userView(env: Env, db: Db, user: User, cache: LayeredCache) {
   };
 }
 
-/** /api/* — the Telegram Mini App backend. */
+/** Who is calling: Telegram Mini App initData ("tma ...") or a website login ("tglogin ..."). */
+async function authenticate(req: Request, env: Env): Promise<TelegramWebAppUser | null> {
+  const auth = req.headers.get("authorization") ?? "";
+  if (!env.TELEGRAM_BOT_TOKEN) return null;
+  if (auth.startsWith("tma ")) return verifyInitData(auth.slice(4), env.TELEGRAM_BOT_TOKEN);
+  if (auth.startsWith("tglogin ")) return verifyLoginWidget(auth.slice(8), env.TELEGRAM_BOT_TOKEN);
+  return null;
+}
+
+/** Unauthenticated: what the website shows before login. Real totals only, never per-user data. */
+async function publicInfo(env: Env, cache: LayeredCache) {
+  const db = getDb(env.DB);
+  const [bot, totals] = await Promise.all([
+    env.TELEGRAM_BOT_TOKEN ? getBotInfo(env, cache).then((b) => b.username).catch(() => null) : Promise.resolve(null),
+    cache.getOrLoad("public:stats", CACHE_POLICY.publicStats, async () => {
+      const [users, wallets, swept] = await Promise.all([
+        db.user.count(),
+        db.sessionWallet.count(),
+        db.auditLog.aggregate({ where: { status: "OK", action: { in: ["FLOSS", "AUTO_FLOSS", "SESSION_END_FLOSS"] } }, _sum: { lamports: true } }),
+      ]);
+      return { users, wallets, sweptLamports: (swept._sum.lamports ?? 0n).toString() };
+    }),
+  ]);
+  return { bot, stats: totals.value };
+}
+
+/** /api/* — backend for the Mini App (inside Telegram) and the website (Telegram login). */
 export async function handleMiniApp(req: Request, env: Env, exec: ExecutionContext): Promise<Response> {
   const cors = corsHeaders(env, req);
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
 
-  const auth = req.headers.get("authorization") ?? "";
-  const tgUser = auth.startsWith("tma ") ? await verifyInitData(auth.slice(4), env.TELEGRAM_BOT_TOKEN) : null;
+  if (req.method === "GET" && new URL(req.url).pathname === "/api/public") {
+    return json(await publicInfo(env, new LayeredCache(env, { waitUntil: (p) => exec.waitUntil(p) })), 200, cors);
+  }
+
+  const tgUser = await authenticate(req, env);
   if (!tgUser) return json({ error: "unauthorized" }, 401, cors);
 
   const db = getDb(env.DB);

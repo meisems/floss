@@ -23,7 +23,7 @@ import { decide } from "../src/engine/triggers.ts";
 import type { FlossReport } from "../src/engine/SweepEngine.ts";
 import { classifyInput, decodeTokenAccount, ScanInputError, type RiskReport } from "../src/engine/SimulationGuard.ts";
 import { decryptSeed, encryptSeed, newUserSalt } from "../src/lib/crypto.ts";
-import { verifyInitData } from "../src/lib/telegramAuth.ts";
+import { verifyInitData, verifyLoginWidget } from "../src/lib/telegramAuth.ts";
 import { hmacSha256, toHex } from "../src/lib/crypto.ts";
 import { formatSol, formatTokenAmount, parseJson, parseSol, stringifyJson, toBase64 } from "../src/lib/util.ts";
 import { feeFor } from "../src/solana/tx.ts";
@@ -312,5 +312,26 @@ describe("scan input + token layout", () => {
       closeAuthority: null,
     });
     expect(decodeTokenAccount(new Uint8Array(100))).toBeNull();
+  });
+});
+
+describe("Telegram login widget", () => {
+  async function sign(params: Record<string, string>, token: string): Promise<string> {
+    const dcs = Object.entries(params).map(([k, v]) => `${k}=${v}`).sort().join("\n");
+    const secret = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)));
+    const hash = toHex(await hmacSha256(secret, dcs));
+    return new URLSearchParams({ ...params, hash }).toString();
+  }
+
+  it("accepts a valid login and rejects tampering, stale logins and Mini App data", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const params = { id: "42", first_name: "De Gen", username: "degen", photo_url: "https://t.me/i/userpic/320/x.jpg", auth_date: String(now) };
+    const good = await sign(params, "123:ABC");
+    expect(await verifyLoginWidget(good, "123:ABC")).toEqual({ id: 42, username: "degen" });
+    expect(await verifyLoginWidget(good, "123:XYZ")).toBeNull();
+    expect(await verifyLoginWidget(good.replace("id=42", "id=43"), "123:ABC")).toBeNull();
+    expect(await verifyLoginWidget(await sign({ ...params, auth_date: String(now - 8 * 86_400) }, "123:ABC"), "123:ABC")).toBeNull();
+    // A login is not Mini App initData and vice versa (different key derivation).
+    expect(await verifyInitData(good, "123:ABC")).toBeNull();
   });
 });

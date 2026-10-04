@@ -43,6 +43,8 @@ export const CACHE_POLICY = {
   tokenMeta: { l0Ms: 600_000, l1Seconds: 3_600, l2Seconds: 86_400, negativeSeconds: 600 },
   /** Display-only. Sweeps read settings straight from D1. Invalidated on every write. */
   userView: { l0Ms: 5_000, l2Seconds: 300 },
+  /** Public totals on the website's landing view. A minute of lag is invisible there. */
+  publicStats: { l0Ms: 30_000, l2Seconds: 60 },
   /** grammY needs botInfo on every webhook; getMe once a day is plenty. */
   botInfo: { l0Ms: 3_600_000, l2Seconds: 86_400 },
 } as const satisfies Record<string, CachePolicy>;

@@ -37,6 +37,11 @@ const store = {
       localStorage.setItem(k, v);
     } catch {}
   },
+  del: (k) => {
+    try {
+      localStorage.removeItem(k);
+    } catch {}
+  },
 };
 const haptic = (kind = "light") => {
   try {
@@ -78,6 +83,8 @@ const I = {
   hourglass: '<path d="M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9s8 4 8 9"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
+  plane: '<path d="M21 4L3 11.5l6.5 2L12 20l3.2-4.3L20 19z"/><path d="M9.5 13.5L21 4"/>',
+  logout: '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 16l-4-4 4-4M6 12h10"/>',
   auto: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17A8.5 8.5 0 0 0 12 3.5z" fill="currentColor"/>',
 };
 const icon = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[name] ?? ""}</svg>`;
@@ -169,7 +176,12 @@ function renderSheet() {
       ["dark", "Dark"],
     ]
       .map(([m, label]) => `<button data-mode="${m}" class="${theme.mode === m ? "on" : ""}">${icon(m === "light" ? "sun" : m === "dark" ? "moon" : "auto")}${label}</button>`)
-      .join("")}</div>`;
+      .join("")}</div>
+    ${state.web && state.me ? `<button class="btn ghost wide" id="logout" style="margin-top:14px">${icon("logout")}Log out</button>` : ""}`;
+  $("#logout", sheet)?.addEventListener("click", () => {
+    store.del(LOGIN_KEY);
+    location.replace(location.pathname);
+  });
   sheet.querySelectorAll("[data-skin]").forEach((b) => b.addEventListener("click", () => setTheme({ skin: b.dataset.skin })));
   sheet.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => setTheme({ mode: b.dataset.mode })));
 }
@@ -207,18 +219,26 @@ function countUp(root) {
 }
 
 // ---- API --------------------------------------------------------------------------------------
+// Inside Telegram: Mini App initData. On the website: the signed "Log in with Telegram" payload.
+const LOGIN_KEY = "floss.login";
+function authHeader() {
+  if (tg?.initData) return `tma ${tg.initData}`;
+  const login = store.get(LOGIN_KEY, "");
+  return login ? `tglogin ${login}` : "";
+}
+
 async function api(path, opts = {}) {
   const res = await fetch(`/api${path}`, {
     ...opts,
-    headers: { "content-type": "application/json", authorization: `tma ${tg?.initData ?? ""}`, ...(opts.headers ?? {}) },
+    headers: { "content-type": "application/json", authorization: authHeader(), ...(opts.headers ?? {}) },
   });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+  if (!res.ok) throw Object.assign(new Error(body.error || `HTTP ${res.status}`), { status: res.status });
   return body;
 }
 
 // ---- State + routing --------------------------------------------------------------------------
-const state = { me: null, tab: "home", scan: null, scanInput: "", audit: null };
+const state = { me: null, tab: "home", scan: null, scanInput: "", audit: null, web: !tg?.initData, pub: null };
 const TABS = ["home", "scan", "earn", "rules", "log"];
 const TAB_ICONS = { home: "wallet", scan: "shield", earn: "gift", rules: "sliders", log: "pulse" };
 
@@ -624,11 +644,80 @@ function logView() {
   return wrap;
 }
 
+// ---- Website (outside Telegram) ------------------------------------------------------------------
+const FEATURES = [
+  ["trend", "Auto-sweep"],
+  ["unlink", "Revoke"],
+  ["broom", "Reclaim rent"],
+  ["shield", "Pre-flight scan"],
+];
+
+/** Logged-out website: what Floss is, live network totals, and Telegram login. */
+function landingView(notice) {
+  const pub = state.pub ?? { bot: null, stats: null };
+  const st = pub.stats;
+  const bot = pub.bot;
+  const view = h(`<section class="landing enter">
+    <div class="land-hero">
+      <div class="land-mark">${logo}</div>
+      <h1>Floss your<br><span class="grad-text">wallet.</span></h1>
+      <p>Burner wallets that sweep profit to cold storage on their own.</p>
+    </div>
+    <div class="feat">${FEATURES.map(([i, t]) => `<div class="glass feat-i">${icon(i)}<span>${t}</span></div>`).join("")}</div>
+    ${notice ? `<div class="glass notice">${icon("alert")}<span>${esc(notice)}</span></div>` : ""}
+    <div class="glass login">
+      <div class="label">dashboard</div>
+      <div id="tgLogin" class="tg-login">${bot ? "" : `<span class="muted">Bot not connected yet</span>`}</div>
+      ${bot ? `<a class="btn ghost wide" href="https://t.me/${encodeURIComponent(bot)}" target="_blank" rel="noopener">${icon("plane")}Open @${esc(bot)}</a>` : ""}
+    </div>
+    ${
+      st && st.users > 0
+        ? `<div class="tiles">
+            <div class="glass tile">${icon("users")}<b data-count="${st.users}" data-digits="0">0</b><span>users</span></div>
+            <div class="glass tile">${icon("wallet")}<b data-count="${st.wallets}" data-digits="0">0</b><span>wallets</span></div>
+            <div class="glass tile">${icon("coin")}<b data-count="${toSol(st.sweptLamports)}" data-digits="2">0</b><span>SOL swept</span></div>
+          </div>`
+        : ""
+    }
+  </section>`);
+  if (bot) {
+    // Redirect flow (no inline callback, so the CSP needs no unsafe-eval): Telegram sends the
+    // signed login back to this page as query parameters, which boot() picks up.
+    const s = document.createElement("script");
+    s.async = true;
+    s.src = "https://telegram.org/js/telegram-widget.js?22";
+    s.dataset.telegramLogin = bot;
+    s.dataset.size = "large";
+    s.dataset.radius = "14";
+    s.dataset.authUrl = `${location.origin}/`;
+    s.dataset.requestAccess = "write";
+    $("#tgLogin", view).append(s);
+  }
+  return view;
+}
+
+function showLanding(notice) {
+  const app = $("#app");
+  app.innerHTML = "";
+  const bar = topBar();
+  $(".chip", bar)?.remove();
+  app.append(bar, landingView(notice));
+  countUp(app);
+}
+
 // ---- Boot ---------------------------------------------------------------------------------------
 function gate(message) {
   const app = $("#app");
   app.innerHTML = "";
   app.append(h(`<div class="gate enter"><div class="brand" style="justify-content:center">${logo}<span>floss</span></div><h1>${esc(message)}</h1></div>`));
+}
+
+/** Telegram's login redirect lands here as ?id=...&hash=...; keep it and clean the address bar. */
+function captureLogin() {
+  const q = new URLSearchParams(location.search);
+  if (!q.has("hash") || !q.has("id") || !q.has("auth_date")) return;
+  store.set(LOGIN_KEY, q.toString());
+  history.replaceState(null, "", location.pathname);
 }
 
 async function boot() {
@@ -641,19 +730,29 @@ async function boot() {
   $("#scrim").addEventListener("click", closeSheet);
 
   let error = null;
-  if (!tg?.initData) error = "Open Floss from the bot";
-  else {
+  let landing = false;
+  let notice = null;
+  if (state.web) captureLogin();
+  if (tg?.initData || store.get(LOGIN_KEY, "")) {
     try {
       state.me = await api("/me");
     } catch (err) {
-      error = err.message;
+      if (!state.web) error = err.message;
+      else {
+        // Expired/invalid login: forget it. Not registered yet: say how to fix it.
+        if (err.status === 401) store.del(LOGIN_KEY);
+        landing = true;
+        notice = err.status === 401 ? "Login expired. Log in again." : err.message;
+      }
     }
-  }
+  } else landing = true;
+  if (landing) state.pub = await api("/public").catch(() => null);
 
   $("#progress").classList.add("full");
   const wait = Math.max(0, MIN_LOADER_MS - (Date.now() - started));
   setTimeout(() => {
     if (error) gate(error);
+    else if (landing) showLanding(notice);
     else {
       setupNav();
       render();

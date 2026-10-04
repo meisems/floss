@@ -26,7 +26,7 @@
     "FEE_BPS": "100",
     "REFERRAL_SHARE_BPS": "2500",
     // Your Pages project URL, e.g. "https://floss-app.pages.dev". Leave empty to hide the Mini App.
-    "PAGES_URL": ""
+    "PAGES_URL": "https://floss-app.pages.dev"
   },
 
   // No IDs on purpose: the first deploy creates the D1 database, KV namespace and both queues
